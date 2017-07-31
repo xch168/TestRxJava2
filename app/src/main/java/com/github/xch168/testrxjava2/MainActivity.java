@@ -8,6 +8,7 @@ import android.util.TimeUtils;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
+import java.util.concurrent.Callable;
 import java.util.concurrent.TimeUnit;
 
 import io.reactivex.Flowable;
@@ -40,7 +41,7 @@ public class MainActivity extends AppCompatActivity {
         //zipOp();
         //concatOp();
         //flatMapOp();
-        concatMapOp();
+        //concatMapOp();
         //distinctOp();
         //filterOp();
         //bufferOp();
@@ -52,6 +53,141 @@ public class MainActivity extends AppCompatActivity {
         //justOp();
         //singleTest();
         //debounceOp();
+        //deferOp();
+        //lastOp();
+        //mergeOp();
+        //reduceOp();
+        //scanOp();
+        //windowOp();
+    }
+
+    /**
+     * 按实际划分窗口，将数据发送给不同的Observable
+     */
+    private void windowOp() {
+        Observable.interval(1, TimeUnit.SECONDS)
+                .take(15)
+                .window(3, TimeUnit.SECONDS)
+                .subscribeOn(Schedulers.io())
+                .observeOn(AndroidSchedulers.mainThread())
+                .subscribe(new Consumer<Observable<Long>>() {
+                    @Override
+                    public void accept(Observable<Long> longObservable) throws Exception {
+                        Log.i(TAG, "Sub Divide begin...");
+                        longObservable.subscribeOn(Schedulers.io())
+                                .observeOn(AndroidSchedulers.mainThread())
+                                .subscribe(new Consumer<Long>() {
+                                    @Override
+                                    public void accept(Long aLong) throws Exception {
+                                        Log.i(TAG, "Next:" + aLong);
+                                    }
+                                });
+                    }
+                });
+    }
+
+    /**
+     * 和reduce操作一致，区别在于reduce关注的是结果，而scan会把每个步骤都输出
+     */
+    private void scanOp() {
+        Observable.just(1, 2 , 3)
+                .scan(new BiFunction<Integer, Integer, Integer>() {
+                    @Override
+                    public Integer apply(Integer integer, Integer integer2) throws Exception {
+                        return integer + integer2;
+                    }
+                })
+                .subscribe(new Consumer<Integer>() {
+                    @Override
+                    public void accept(Integer integer) throws Exception {
+                        Log.i(TAG, "accept: scan:" + integer);
+                    }
+                });
+    }
+
+    /**
+     * 每次用一个方法处理一个值
+     */
+    private void reduceOp() {
+        Observable.just(1, 2, 3, 4)
+                .reduce(new BiFunction<Integer, Integer, Integer>() {
+                    @Override
+                    public Integer apply(Integer integer, Integer integer2) throws Exception {
+                        Log.i(TAG, "i:" + integer + " i2:" + integer2);
+                        return integer + integer2;
+                    }
+                })
+                .subscribe(new Consumer<Integer>() {
+                    @Override
+                    public void accept(Integer integer) throws Exception {
+                        Log.i(TAG, "accept:reduce:" + integer);
+                    }
+                });
+    }
+
+    /**
+     * 用于把躲过Observable结合起来，接受可变参数，
+     * 和concat的区别在于，不用等到发射器A发送完所有的事件再进行发射器B的发送
+     */
+    private void mergeOp() {
+        Observable.merge(Observable.just(1, 2), Observable.just(3, 4, 5), Observable.just(6, 7))
+                .subscribe(new Consumer<Integer>() {
+                    @Override
+                    public void accept(Integer integer) throws Exception {
+                        Log.i(TAG, "accept: merge:" + integer);
+                    }
+                });
+    }
+
+    /**
+     * 获取客观察到的最后一个值
+     */
+    private void lastOp() {
+
+        List<Integer> list = new ArrayList<>();
+        list.add(1);
+        Observable.fromIterable(list)
+                .last(10)
+                .subscribe(new Consumer<Integer>() {
+                    @Override
+                    public void accept(Integer integer) throws Exception {
+                        Log.i(TAG, "last:" + integer);
+                    }
+                });
+    }
+
+    /**
+     * 每次订阅都会创建一个新的Observable
+     */
+    private void deferOp() {
+        Observable<Integer> observable = Observable.defer(new Callable<ObservableSource<? extends Integer>>() {
+            @Override
+            public ObservableSource<? extends Integer> call() throws Exception {
+                return Observable.just(1, 2, 3);
+            }
+        });
+
+        observable.subscribe(new Observer<Integer>() {
+            @Override
+            public void onSubscribe(Disposable d) {
+
+            }
+
+            @Override
+            public void onNext(Integer integer) {
+                Log.i(TAG, "defer:" + integer);
+            }
+
+            @Override
+            public void onError(Throwable e) {
+                Log.i(TAG, "defer: onError:" + e.getMessage());
+            }
+
+            @Override
+            public void onComplete() {
+                Log.i(TAG, "defer: onComplete");
+            }
+        });
     }
 
     /**
